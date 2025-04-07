@@ -1,0 +1,10 @@
+name = "PubGrub"
+version = "0.1.0"
+defaultTargets = ["pubgrub"]
+
+[[lean_lib]]
+name = "PubGrub"
+
+[[lean_exe]]
+name = "pubgrub"
+root = "Main"
