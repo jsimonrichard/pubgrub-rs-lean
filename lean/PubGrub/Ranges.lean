@@ -1,24 +1,29 @@
 import Std
 import PubGrub.VersionSet
+import Mathlib
 
-variable [Ord V]
+variable [LinearOrder V] [BEq V]
 
-inductive Bound (v : Type) [Ord V] where
+inductive Bound (V : Type) [LinearOrder V] where
   | Included (v : V)
   | Excluded (v : V)
   | Unbounded
 deriving BEq
 
-structure Segment (v : Type) [Ord v] where
+structure Segment (V : Type) [LinearOrder V] where
   left : Bound V
   right : Bound V
   wellFormed : match left, right with
-    | Bound.Included v1, Bound.Included v2 => (compare v1 v2).isLE
-    | Bound.Included v1, Bound.Excluded v2 => compare v1 v2 = .le
-    | Bound.Excluded v1, Bound.Included v2 => compare v1 v2 = .lt
-    | Bound.Excluded v1, Bound.Excluded v2 => compare v1 v2 = .le
+    | (Bound.Included v1), (Bound.Included v2) => v1 ≤ v2
+    | (Bound.Included v1), (Bound.Excluded v2)
+    | (Bound.Excluded v1), (Bound.Included v2)
+    | (Bound.Excluded v1), (Bound.Excluded v2) => v1 < v2
     | _, _ => True
-deriving BEq
+    := by simp_all only; rfl
+
+
+instance : BEq (Segment V) where
+  beq s1 s2 := s1.left == s2.left && s1.right == s2.right
 
 class StrictPartialOrder (α : Type) where
   lt : α → α → Prop
@@ -27,31 +32,73 @@ class StrictPartialOrder (α : Type) where
 
 instance [StrictPartialOrder α] : LT α := ⟨StrictPartialOrder.lt⟩
 
-
 instance : StrictPartialOrder (Segment V) where
-  lt := λ s1 s2 => (
+  lt s1 s2 := (
     match s1.right, s2.left with
-    | Bound.Included v1, Bound.Included v2 => (compare v1 v2).isLT
-    | Bound.Excluded v1, Bound.Included v2 => (compare v1 v2).isLE
-    | Bound.Included v1, Bound.Excluded v2 => (compare v1 v2).isLE
+    | Bound.Included v1, Bound.Included v2 => v1 < v2
+    | Bound.Excluded v1, Bound.Included v2 => v1 ≤ v2
+    | Bound.Included v1, Bound.Excluded v2 => v1 ≤ v2
     | _, _ => False
   )
+  lt_irrefl s := by
+    cases s with
+    | mk left right wellFormed =>
+      cases right
+      all_goals simp_all -- handles Unbounded cases
+      case Included v1 =>
+        cases left
+        all_goals simp at wellFormed
+        all_goals simp_all -- handles Unbounded cases
+
+      case Excluded v1 =>
+        cases left
+        all_goals simp at wellFormed
+        all_goals simp_all -- handles Unbounded and Excluded cases
+
+  lt_trans s1 s2 s3 h12 h23 := by
+    cases s1 with
+    | mk _ b1 _ =>
+      cases b1
+      cases s2 with
+      | mk b2 b3 wellFormed =>
+        cases b2
+        cases b3
+        cases s3 with
+        | mk b4 _ _ =>
+          cases b4
+          all_goals simp at wellFormed
+          all_goals simp_all
+          case mk.Included.mk.Included.Included.mk.Included v4 _ v3 v2 _ v1 _ =>
+            have h' : v3 < v1 := by
+              apply lt_of_le_of_lt
+              exact wellFormed
+              exact h23
+            trans v3
+            . exact h12
+            . exact h'
+
+          case mk.Included.mk.Included.Included.mk.Excluded v4 _ v3 v2 _ v1 _ =>
+            sorry
+
+
+
+
 /-- Ranges represents multiple intervals of a continuous range of monotone increasing values.
 
     Invariants:
     1. The segments are sorted, from lowest to highest
     2. Each segment contains at least one version (start < endBound)
     3. There is at least one version between two segments -/
-structure Ranges (V : Type) [Ord V] where
+structure Ranges (V : Type) [LinearOrder V] where
   segments : List (Segment V)
 deriving BEq
 
 namespace Ranges
 
-def empty [Ord V] : Ranges V where
+def empty : Ranges V where
   segments := []
 
-def full [Ord V] : Ranges V where
+def full : Ranges V where
   segments := [{ left := Bound.Unbounded, right := Bound.Unbounded }]
 
 def singleton (v : V) : Ranges V where

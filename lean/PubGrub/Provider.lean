@@ -30,5 +30,14 @@ def versions (self : OfflineDependencyProvider P V) (package : P) : List V :=
 def getDependencies (self : OfflineDependencyProvider P V) (package : P) (version : V) : Option $ DependencyConstraints P V :=
   self.dependencies.getD package .empty |>.get? version
 
-
 end OfflineDependencyProvider
+
+instance : DependencyProvider (OfflineDependencyProvider P V) where
+  P := P
+  V := V
+  E := Empty
+  Priority := Nat
+  M := String
+  chooseVersion := fun self package vs =>
+    let versions := self.dependencies.getD package .empty
+    versions.keys.find? fun v => (vs v)
