@@ -32,12 +32,25 @@ class StrictPartialOrder (α : Type) where
 
 instance [StrictPartialOrder α] : LT α := ⟨StrictPartialOrder.lt⟩
 
+lemma Ordering.lt_eq_iff_not_ge (o : Ordering) : o = lt ∨ o = eq ↔ o ≠ gt := by
+  constructor
+  . intro h
+    cases o
+    all_goals simp
+    cases h
+    all_goals simp_all
+  . intro h
+    cases o
+    all_goals simp
+    apply h
+    simp
+
 instance : StrictPartialOrder (Segment V) where
   lt s1 s2 := (
     match s1.right, s2.left with
-    | Bound.Included v1, Bound.Included v2 => v1 < v2
-    | Bound.Excluded v1, Bound.Included v2 => v1 ≤ v2
-    | Bound.Included v1, Bound.Excluded v2 => v1 ≤ v2
+    | Bound.Included v1, Bound.Included v2 => (compare v1 v2).isLT
+    | Bound.Excluded v1, Bound.Included v2 => (compare v1 v2).isLE
+    | Bound.Included v1, Bound.Excluded v2 => (compare v1 v2).isLE
     | _, _ => False
   )
   lt_irrefl s := by
@@ -49,11 +62,21 @@ instance : StrictPartialOrder (Segment V) where
         cases left
         all_goals simp at wellFormed
         all_goals simp_all -- handles Unbounded cases
+        . rw [Bool.eq_false_iff]
+          intro h
+          rw [Ordering.isLT_iff_eq_lt, compare_lt_iff_lt] at h
+          absurd h
+          simp [wellFormed]
+        . rw [compare_gt_iff_gt]
+          simp [wellFormed]
+
 
       case Excluded v1 =>
         cases left
         all_goals simp at wellFormed
         all_goals simp_all -- handles Unbounded and Excluded cases
+        rw [compare_gt_iff_gt]
+        simp [wellFormed]
 
   lt_trans s1 s2 s3 h12 h23 := by
     cases s1 with
@@ -68,7 +91,9 @@ instance : StrictPartialOrder (Segment V) where
           cases b4
           all_goals simp at wellFormed
           all_goals simp_all
+
           case mk.Included.mk.Included.Included.mk.Included v4 _ v3 v2 _ v1 _ =>
+            rw [Ordering.isLT_iff_eq_lt, compare_lt_iff_lt] at *
             have h' : v3 < v1 := by
               apply lt_of_le_of_lt
               exact wellFormed
@@ -78,7 +103,76 @@ instance : StrictPartialOrder (Segment V) where
             . exact h'
 
           case mk.Included.mk.Included.Included.mk.Excluded v4 _ v3 v2 _ v1 _ =>
-            sorry
+            rw [Ordering.isLT_iff_eq_lt, compare_lt_iff_lt] at *
+            rw [
+              Ordering.isLE_iff_eq_lt_or_eq_eq,
+              Ordering.lt_eq_iff_not_ge,
+              compare_le_iff_le
+            ] at *
+            have h' : v4 ≤ v3 := le_of_lt h12
+            trans v2
+            . trans v3
+              . exact h'
+              . exact wellFormed
+            . exact h23
+
+        case mk.Included.mk.Included =>
+          cases s3 with
+          | mk b4 _ _ =>
+            cases b4
+            all_goals simp_all
+            simp at wellFormed
+            rw [Ordering.isLT_iff_eq_lt, compare_lt_iff_lt] at *
+            rw [
+              Ordering.isLE_iff_eq_lt_or_eq_eq,
+              Ordering.lt_eq_iff_not_ge,
+              compare_le_iff_le
+            ] at *
+            case Included v4 _ v3 v2 _ v1 _ =>
+              have h' : v3 < v1 := by
+                apply lt_of_lt_of_le
+                exact wellFormed
+                exact h23
+              trans v3
+              . exact h12
+              . exact h'
+
+        all_goals simp_all
+        case mk.Included.mk.Excluded =>
+          cases s3 with
+          | mk b4 _ _ =>
+            cases b3
+            cases b4
+            all_goals simp_all
+            rw [Ordering.isLT_iff_eq_lt, compare_lt_iff_lt] at *
+            any_goals rw [
+              Ordering.isLE_iff_eq_lt_or_eq_eq,
+              Ordering.lt_eq_iff_not_ge,
+              compare_le_iff_le
+            ] at *
+            case Included v4 _ v3 _ v2 v1 _ =>
+              have h' : v4 < v2 := by
+                apply lt_of_le_of_lt
+                exact h12
+                exact wellFormed
+              trans v2
+              . exact h'
+              . exact h23
+
+            case Excluded v4 _ v3 _ v2 v1 _ =>
+              have h' : v3 ≤ v2 := le_of_lt wellFormed
+              trans v2
+              . trans v3
+                . exact h12
+                . exact h'
+              . exact h23
+
+            case Excluded v4 _ v3 _ v2 v1 _ =>
+
+
+
+
+
 
 
 
