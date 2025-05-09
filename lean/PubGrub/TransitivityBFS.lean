@@ -26,7 +26,8 @@ partial def loop (queue : Array (Expr × Array (Expr × Name)))
         newQueue := newQueue.push (y, path.push (h, rel))
     loop newQueue visited edges rhs
 
-elab "solve_ineq_chain" : tactic => do
+elab "solve_ineq_chain" : tactic =>
+  Lean.Elab.Tactic.withMainContext do
   let goal ← getMainGoal
   let tgt ← getMainTarget
   -- Parse the goal: expect `a < b` or `a ≤ b`
@@ -36,6 +37,7 @@ elab "solve_ineq_chain" : tactic => do
     | (``LE.le, #[_, _, lhs, rhs]) => pure (`le, lhs, rhs)
     | _ => throwError "Goal is not a strict or non-strict inequality"
   -- Collect all hypotheses of the form `x < y` or `x ≤ y`
+
   let lctx ← getLCtx
   let mut edges : Array (Expr × Name × Expr × Expr) := #[]
   for localDecl in lctx do
@@ -78,7 +80,6 @@ elab "solve_ineq_chain" : tactic => do
     if goalRel == `le && path.any (fun (_, rel) => rel == `lt) then
       prf ← mkAppM ``le_of_lt #[prf]
     goal.assign prf
-
 
 example (a b c d e : Nat)
   (h1 : a < b) (h2 : b ≤ c) (h3 : c < d) (h4 : d < e)
